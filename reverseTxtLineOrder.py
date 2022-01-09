@@ -1,6 +1,6 @@
 # Yedidya Harris
 # 09/01/2022
-# a script to reverse the order of the lines in a text file
+# A Python script to reverse the order of the lines in a text file
 
 # When did I need this script?
 # On my plotting webpage of sensor data, I have a log file presented. It is an iframe, that shows a txt file.
