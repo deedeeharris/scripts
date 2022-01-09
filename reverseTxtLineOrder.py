@@ -8,8 +8,8 @@
 # Using the following code, I reverse the order of my log file.
 
 # vars: path file for source txt file and destinatio file
-filePathSource = 'w:/log/LoggerNet.log' # CHANGE TO YOUR FILE PATH
-filePathDestination = 'w:/log/LoggerNet_reversed.log' # CHANGE TO YOUR FILE PATH
+filePathSource = 'log/LoggerNet.log' # CHANGE TO YOUR FILE PATH
+filePathDestination = 'log/LoggerNet_reversed.log' # CHANGE TO YOUR FILE PATH
 
 
 # the function, there is no need to change anything here
