@@ -1,162 +1,128 @@
 (function() {
-    let scrollInterval;
-    let lastScrollTop = -1;
-    let noChangeCount = 0;
-    const MAX_NO_CHANGE = 5;
-    const SCROLL_INTERVAL = 150;
-    const DELAY_BEFORE_SAVE = 2000; // 2 seconds delay before saving
+    function logAllTables() {
+        const allDivs = document.querySelectorAll('div');
+        console.log("Total divs found:", allDivs.length);
 
-    function getScrollContainer() {
-        return new Promise(resolve => {
-            const checkExist = setInterval(() => {
-                const tableBody = document.querySelector('.ant-table-body, .ReportGenerator_custom-scrollbar__2petG');
-                if (tableBody && tableBody.scrollHeight > tableBody.clientHeight) {
-                    console.log("✅ Found scroll container:", tableBody);
-                    clearInterval(checkExist);
-                    resolve(tableBody);
-                }
-            }, 500);
-        });
-    }
-
-    function scrollToBottom(scrollContainer) {
-        const scrollHeight = scrollContainer.scrollHeight;
-        const clientHeight = scrollContainer.clientHeight;
-        const scrollTop = scrollContainer.scrollTop;
-
-        if (scrollTop + clientHeight < scrollHeight) {
-            scrollContainer.scrollTop = scrollHeight;
-
-            if (scrollContainer.scrollTop === lastScrollTop) {
-                noChangeCount++;
-                if (noChangeCount >= MAX_NO_CHANGE) {
-                    console.log("✅ Scroll position hasn't changed. Stopping.");
-                    stopScrolling();
-                    setTimeout(window.convertAndDownload, DELAY_BEFORE_SAVE);
-                }
-            } else {
-                noChangeCount = 0;
+        const potentialTables = [];
+        allDivs.forEach((div, index) => {
+            if (div.className && div.className.includes('ant-table-container')) {
+                potentialTables.push(div);
             }
-            lastScrollTop = scrollContainer.scrollTop;
-        } else {
-            stopScrolling();
-            setTimeout(window.convertAndDownload, DELAY_BEFORE_SAVE);
-        }
-    }
-
-    function startScrolling(scrollContainer) {
-        if (!scrollInterval) {
-            scrollInterval = setInterval(() => scrollToBottom(scrollContainer), SCROLL_INTERVAL);
-        }
-    }
-
-    function stopScrolling() {
-        clearInterval(scrollInterval);
-        scrollInterval = null;
-        console.log("🛑 Scrolling stopped.");
-    }
-
-    function addButton() {
-        if (document.getElementById("stopScrollButton")) return;
-
-        const button = document.createElement("button");
-        button.id = "stopScrollButton";
-        button.textContent = "Stop Scrolling";
-        button.style.position = "fixed";
-        button.style.bottom = "20px";
-        button.style.right = "20px";
-        button.style.zIndex = "10000";
-        button.style.padding = "10px";
-        button.style.backgroundColor = "red";
-        button.style.color = "white";
-        button.style.border = "none";
-        button.style.borderRadius = "5px";
-        button.style.cursor = "pointer";
-        button.onclick = stopScrolling;
-        document.body.appendChild(button);
-    }
-
-    function convertTableToCSV(tableSelector) {
-        const table = document.querySelector(tableSelector);
-        if (!table) {
-            console.error("❌ Table not found:", tableSelector);
-            return null;
-        }
-
-        const rows = table.querySelectorAll(".ant-table-row");
-        if (rows.length === 0) {
-            console.error("❌ No data rows found in the table.");
-            return null;
-        }
-
-        let csv = [];
-        const headerRow = table.querySelector(".ant-table-thead tr");
-        if (headerRow) {
-            const headers = headerRow.querySelectorAll("th");
-            const headerValues = [];
-            headers.forEach(header => {
-                let headerText = '';
-                const titleSpan = header.querySelector('.ant-table-column-title');
-                if (titleSpan) {
-                    headerText = titleSpan.textContent.trim();
-                } else {
-                    headerText = header.textContent.trim();
-                }
-                headerValues.push(cleanCSVValue(headerText));
-            });
-            csv.push(headerValues.join(','));
-        }
-
-        rows.forEach(row => {
-            const rowData = [];
-            const cells = row.querySelectorAll("td");
-            cells.forEach(cell => {
-                rowData.push(cleanCSVValue(cell.textContent.trim()));
-            });
-            csv.push(rowData.join(','));
         });
 
-        return csv.join('\n');
+        console.log("Found potential table containers:", potentialTables);
+
+        return potentialTables;
     }
 
-    function cleanCSVValue(value) {
-        let escapedValue = value.replace(/"/g, '""');
-        if (escapedValue.includes(',') || escapedValue.includes('\n') || escapedValue.includes('"')) {
-            escapedValue = `"${escapedValue}"`;
-        }
-        return escapedValue;
+
+    function extractDataFromTable(tableContainer) {
+      if (!tableContainer) {
+        console.error("❌ Invalid table container provided to extractDataFromTable.");
+        return "";
+      }
+
+      let csv = [];
+      const rowSet = new Set(); // Use a Set to track unique rows
+
+      // --- Extract Headers ---
+      const headerRows = tableContainer.querySelectorAll('.ant-table-thead > tr');
+      if (headerRows.length > 0) {
+          const headerRow = headerRows[0]; // Usually, headers are in the first row
+          const headers = headerRow.querySelectorAll('th');
+          const headerText = Array.from(headers).map(header => {
+              // Look for .ant-table-column-title first, fallback to th content
+              const titleSpan = header.querySelector('.ant-table-column-title');
+              return titleSpan ? titleSpan.textContent.trim() : header.textContent.trim();
+          });
+          csv.push(headerText.join(','));
+      } else {
+          console.warn("No header rows found in the table.");
+      }
+
+
+      // --- Extract Data Rows ---
+      const bodyRows = tableContainer.querySelectorAll('.ant-table-tbody > .ant-table-row');
+      console.log(`Found ${bodyRows.length} data rows.`);
+
+      bodyRows.forEach(row => {
+          const rowData = [];
+          const cells = row.querySelectorAll('td');
+          cells.forEach(cell => rowData.push(cell.textContent.trim()));
+
+          const rowString = rowData.join(',');
+          if (!rowSet.has(rowString)) {
+              rowSet.add(rowString);
+              csv.push(rowString);
+          }
+      });
+
+      return csv.join('\n');
     }
 
-    function downloadCSV(csvContent, filename) {
-        if (!csvContent) return;
-        const bom = new Uint8Array([0xEF, 0xBB, 0xBF]); // UTF-8 BOM
-        const blob = new Blob([bom, csvContent], { type: 'text/csv;charset=utf-8' });
-        let url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.setAttribute("href", url);
-        link.setAttribute("download", filename);
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    }
 
-    function convertAndDownload() {
-        const csvData = convertTableToCSV(".ant-table");
-        downloadCSV(csvData, "table_data.csv");
-    }
-
-    // 🔥 Attach to `window` so you can call them from the console
-    window.convertAndDownload = convertAndDownload;
-    window.startScrolling = startScrolling;
-
-    getScrollContainer().then(scrollContainer => {
-        if (!scrollContainer) {
-            console.error("❌ No scrollable container found. Exiting.");
+    function scrollToBottomAndExtract(tableContainer, callback) {
+        if (!tableContainer) {
+            console.error("scrollToBottomAndExtract: No table container found");
+            callback(""); // Call the callback with empty string if no container
             return;
         }
-        startScrolling(scrollContainer);
-        addButton();
-    });
 
+        const scrollableBody = tableContainer.querySelector('.ant-table-body');
+
+        if (!scrollableBody) {
+            console.error("scrollToBottomAndExtract: No scrollable body found");
+            // If no scrollable body, extract what's visible.
+            const csvData = extractDataFromTable(tableContainer);
+            callback(csvData);
+            return;
+        }
+
+
+        let previousScrollHeight = -1;
+        const scrollInterval = setInterval(() => {
+            const currentScrollHeight = scrollableBody.scrollHeight;
+
+            if (currentScrollHeight > previousScrollHeight) {
+                // More content loaded, scroll to bottom
+                scrollableBody.scrollTop = currentScrollHeight;
+                previousScrollHeight = currentScrollHeight;
+                console.log("Scrolling... Current Scroll Height:", currentScrollHeight);
+            } else {
+                // No more content, stop scrolling and extract data
+                clearInterval(scrollInterval);
+                console.log("Scrolling finished. Extracting data...");
+                const csvData = extractDataFromTable(tableContainer);
+                callback(csvData); // Pass the extracted data to the callback
+            }
+        }, 500); // Check every 500ms if more content has loaded
+    }
+
+
+    setTimeout(() => {
+        const potentialTables = logAllTables();
+
+        if (potentialTables.length > 0) {
+            // We'll only process the first table container found.  You can modify
+            // this to loop through all if needed.
+            scrollToBottomAndExtract(potentialTables[0], (csvContent) => {
+                console.log("Final CSV Content:", csvContent);
+
+                // UTF-8 BOM (Byte Order Mark)
+                const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
+                const blob = new Blob([bom, csvContent], { type: 'text/csv;charset=utf-8' });
+
+                // Create a download link and trigger
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.setAttribute("href", url);
+                link.setAttribute("download", "table_data.csv");
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            });
+        } else {
+            console.error("❌ No potential tables found!");
+        }
+    }, 2000);
 })();
