@@ -10,13 +10,12 @@
         return new Promise(resolve => {
             const checkExist = setInterval(() => {
                 const tableBody = document.querySelector('.ant-table-body, .ReportGenerator_custom-scrollbar__2petG');
-
                 if (tableBody && tableBody.scrollHeight > tableBody.clientHeight) {
                     console.log("✅ Found scroll container:", tableBody);
                     clearInterval(checkExist);
                     resolve(tableBody);
                 }
-            }, 500); // Check every 500ms
+            }, 500);
         });
     }
 
@@ -33,16 +32,15 @@
                 if (noChangeCount >= MAX_NO_CHANGE) {
                     console.log("✅ Scroll position hasn't changed. Stopping.");
                     stopScrolling();
-                    setTimeout(convertAndDownload, DELAY_BEFORE_SAVE);
+                    setTimeout(window.convertAndDownload, DELAY_BEFORE_SAVE);
                 }
             } else {
                 noChangeCount = 0;
             }
-
             lastScrollTop = scrollContainer.scrollTop;
         } else {
             stopScrolling();
-            setTimeout(convertAndDownload, DELAY_BEFORE_SAVE);
+            setTimeout(window.convertAndDownload, DELAY_BEFORE_SAVE);
         }
     }
 
@@ -80,7 +78,6 @@
 
     function convertTableToCSV(tableSelector) {
         const table = document.querySelector(tableSelector);
-
         if (!table) {
             console.error("❌ Table not found:", tableSelector);
             return null;
@@ -93,8 +90,6 @@
         }
 
         let csv = [];
-
-        // Get headers
         const headerRow = table.querySelector(".ant-table-thead tr");
         if (headerRow) {
             const headers = headerRow.querySelectorAll("th");
@@ -112,15 +107,12 @@
             csv.push(headerValues.join(','));
         }
 
-        // Process data rows
         rows.forEach(row => {
             const rowData = [];
             const cells = row.querySelectorAll("td");
-
             cells.forEach(cell => {
                 rowData.push(cleanCSVValue(cell.textContent.trim()));
             });
-
             csv.push(rowData.join(','));
         });
 
@@ -137,11 +129,9 @@
 
     function downloadCSV(csvContent, filename) {
         if (!csvContent) return;
-
         const bom = new Uint8Array([0xEF, 0xBB, 0xBF]); // UTF-8 BOM
         const blob = new Blob([bom, csvContent], { type: 'text/csv;charset=utf-8' });
         let url = URL.createObjectURL(blob);
-
         const link = document.createElement("a");
         link.setAttribute("href", url);
         link.setAttribute("download", filename);
@@ -156,13 +146,15 @@
         downloadCSV(csvData, "table_data.csv");
     }
 
-    // --- Start the process once the scrollable container is found ---
+    // 🔥 Attach to `window` so you can call them from the console
+    window.convertAndDownload = convertAndDownload;
+    window.startScrolling = startScrolling;
+
     getScrollContainer().then(scrollContainer => {
         if (!scrollContainer) {
             console.error("❌ No scrollable container found. Exiting.");
             return;
         }
-
         startScrolling(scrollContainer);
         addButton();
     });
