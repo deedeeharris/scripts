@@ -7,25 +7,20 @@
     const DELAY_BEFORE_SAVE = 2000; // 2 seconds delay before saving
 
     function getScrollContainer() {
-        const tableBody = document.querySelector('.ant-table-body');
+        return new Promise(resolve => {
+            const checkExist = setInterval(() => {
+                const tableBody = document.querySelector('.ant-table-body, .ReportGenerator_custom-scrollbar__2petG');
 
-        if (tableBody && tableBody.scrollHeight > tableBody.clientHeight) {
-            console.log("Found scroll container:", tableBody);
-            return tableBody;
-        }
-
-        console.warn("Could not find the ant-table-body element.  Check the selector.");
-        return null;
+                if (tableBody && tableBody.scrollHeight > tableBody.clientHeight) {
+                    console.log("✅ Found scroll container:", tableBody);
+                    clearInterval(checkExist);
+                    resolve(tableBody);
+                }
+            }, 500); // Check every 500ms
+        });
     }
 
-    const scrollContainer = getScrollContainer();
-
-    if (!scrollContainer) {
-        console.error("No scrollable container found. Exiting.");
-        return;
-    }
-
-    function scrollToBottom() {
+    function scrollToBottom(scrollContainer) {
         const scrollHeight = scrollContainer.scrollHeight;
         const clientHeight = scrollContainer.clientHeight;
         const scrollTop = scrollContainer.scrollTop;
@@ -36,9 +31,8 @@
             if (scrollContainer.scrollTop === lastScrollTop) {
                 noChangeCount++;
                 if (noChangeCount >= MAX_NO_CHANGE) {
-                    console.log("Scroll position hasn't changed. Stopping.");
+                    console.log("✅ Scroll position hasn't changed. Stopping.");
                     stopScrolling();
-                    // Delay before saving
                     setTimeout(convertAndDownload, DELAY_BEFORE_SAVE);
                 }
             } else {
@@ -46,24 +40,22 @@
             }
 
             lastScrollTop = scrollContainer.scrollTop;
-
         } else {
             stopScrolling();
-            // Delay before saving
             setTimeout(convertAndDownload, DELAY_BEFORE_SAVE);
         }
     }
 
-    function startScrolling() {
+    function startScrolling(scrollContainer) {
         if (!scrollInterval) {
-            scrollInterval = setInterval(scrollToBottom, SCROLL_INTERVAL);
+            scrollInterval = setInterval(() => scrollToBottom(scrollContainer), SCROLL_INTERVAL);
         }
     }
 
     function stopScrolling() {
         clearInterval(scrollInterval);
         scrollInterval = null;
-        console.log("Scrolling stopped.");
+        console.log("🛑 Scrolling stopped.");
     }
 
     function addButton() {
@@ -86,19 +78,17 @@
         document.body.appendChild(button);
     }
 
-    // --- CSV Conversion and Download Functions ---
-
     function convertTableToCSV(tableSelector) {
         const table = document.querySelector(tableSelector);
 
         if (!table) {
-            console.error("Table not found with selector:", tableSelector);
+            console.error("❌ Table not found:", tableSelector);
             return null;
         }
 
         const rows = table.querySelectorAll(".ant-table-row");
         if (rows.length === 0) {
-            console.error("No data rows found in the table.");
+            console.error("❌ No data rows found in the table.");
             return null;
         }
 
@@ -161,14 +151,20 @@
         document.body.removeChild(link);
     }
 
-    // --- Function to orchestrate scrolling, conversion, and download ---
     function convertAndDownload() {
         const csvData = convertTableToCSV(".ant-table");
         downloadCSV(csvData, "table_data.csv");
     }
 
-    // --- Start the process ---
-    startScrolling();
-    addButton(); // Optional: Add the stop button
+    // --- Start the process once the scrollable container is found ---
+    getScrollContainer().then(scrollContainer => {
+        if (!scrollContainer) {
+            console.error("❌ No scrollable container found. Exiting.");
+            return;
+        }
+
+        startScrolling(scrollContainer);
+        addButton();
+    });
 
 })();
